@@ -46,8 +46,6 @@ import org.opensearch.env.Environment;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.analysis.IndexAnalyzers;
 import org.opensearch.index.codec.CodecService;
-import org.opensearch.index.codec.CodecServiceConfig;
-import org.opensearch.index.codec.CodecServiceFactory;
 import org.opensearch.index.codec.CodecSettings;
 import org.opensearch.index.mapper.MapperService;
 import org.opensearch.index.similarity.SimilarityService;
@@ -59,7 +57,7 @@ import org.junit.Before;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Optional;
+import java.util.List;
 
 import static org.opensearch.index.codec.customcodecs.backward_codecs.lucene99.Lucene99QatCodec.DEFAULT_COMPRESSION_LEVEL;
 import static org.opensearch.index.codec.customcodecs.backward_codecs.lucene99.Lucene99QatCodec.INDEX_CODEC_QAT_MODE_SETTING;
@@ -174,10 +172,11 @@ public class QatCodecTests extends OpenSearchTestCase {
     private CodecService createCodecService(boolean isMapperServiceNull) throws IOException {
         Settings nodeSettings = Settings.builder().put(Environment.PATH_HOME_SETTING.getKey(), createTempDir()).build();
         if (isMapperServiceNull) {
-            return new CustomCodecService(
+            return new CodecService(
                 null,
                 IndexSettingsModule.newIndexSettings("_na", nodeSettings, INDEX_CODEC_QAT_MODE_SETTING),
-                LogManager.getLogger("test")
+                LogManager.getLogger("test"),
+                List.of(new CustomAdditionalCodecs())
             );
         }
         return buildCodecService(nodeSettings);
@@ -207,12 +206,7 @@ public class QatCodecTests extends OpenSearchTestCase {
             () -> false,
             null
         );
-
-        Optional<CodecServiceFactory> customCodecServiceFactory = plugin.getCustomCodecServiceFactory(indexSettings);
-        if (customCodecServiceFactory.isPresent()) {
-            return customCodecServiceFactory.get().createCodecService(new CodecServiceConfig(indexSettings, service, logger));
-        }
-        return new CustomCodecService(service, indexSettings, LogManager.getLogger("test"));
+        return new CodecService(service, indexSettings, LogManager.getLogger("test"), List.of(new CustomAdditionalCodecs()));
     }
 
     private SegmentReader getSegmentReader(Codec codec) throws IOException {

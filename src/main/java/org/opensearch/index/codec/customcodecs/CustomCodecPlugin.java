@@ -10,7 +10,7 @@ package org.opensearch.index.codec.customcodecs;
 
 import org.opensearch.common.settings.Setting;
 import org.opensearch.index.IndexSettings;
-import org.opensearch.index.codec.CodecServiceFactory;
+import org.opensearch.index.codec.AdditionalCodecs;
 import org.opensearch.index.codec.customcodecs.backward_codecs.lucene101.Lucene101QatCodec;
 import org.opensearch.index.codec.customcodecs.backward_codecs.lucene912.Lucene912QatCodec;
 import org.opensearch.index.codec.customcodecs.backward_codecs.lucene99.Lucene99QatCodec;
@@ -45,14 +45,14 @@ public final class CustomCodecPlugin extends Plugin implements EnginePlugin {
      * @return the engine factory
      */
     @Override
-    public Optional<CodecServiceFactory> getCustomCodecServiceFactory(final IndexSettings indexSettings) {
+    public Optional<AdditionalCodecs> getAdditionalCodecs(final IndexSettings indexSettings) {
         String codecName = indexSettings.getValue(EngineConfig.INDEX_CODEC_SETTING);
-        if (codecName.equals(CustomCodecService.ZSTD_NO_DICT_CODEC)
-            || codecName.equals(CustomCodecService.ZSTD_CODEC)
-            || codecName.equals(CustomCodecService.QAT_LZ4_CODEC)
-            || codecName.equals(CustomCodecService.QAT_DEFLATE_CODEC)
-            || codecName.equals(CustomCodecService.QAT_ZSTD_CODEC)) {
-            return Optional.of(new CustomCodecServiceFactory());
+        if (codecName.equals(CustomAdditionalCodecs.ZSTD_NO_DICT_CODEC)
+            || codecName.equals(CustomAdditionalCodecs.ZSTD_CODEC)
+            || codecName.equals(CustomAdditionalCodecs.QAT_LZ4_CODEC)
+            || codecName.equals(CustomAdditionalCodecs.QAT_DEFLATE_CODEC)
+            || codecName.equals(CustomAdditionalCodecs.QAT_ZSTD_CODEC)) {
+            return Optional.of(new CustomAdditionalCodecs());
         } else {
             if (!QatZipperFactory.isQatAvailable() && isQatCodec(codecName)) {
                 throw new IllegalArgumentException(

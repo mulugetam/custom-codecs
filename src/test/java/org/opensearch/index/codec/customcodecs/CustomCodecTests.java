@@ -49,8 +49,6 @@ import org.opensearch.env.Environment;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.analysis.IndexAnalyzers;
 import org.opensearch.index.codec.CodecService;
-import org.opensearch.index.codec.CodecServiceConfig;
-import org.opensearch.index.codec.CodecServiceFactory;
 import org.opensearch.index.codec.CodecSettings;
 import org.opensearch.index.codec.composite.composite912.Composite912DocValuesFormat;
 import org.opensearch.index.engine.EngineConfig;
@@ -64,15 +62,15 @@ import org.junit.Before;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Optional;
+import java.util.List;
 
 import org.mockito.Mockito;
 
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.QAT_DEFLATE_CODEC;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.QAT_LZ4_CODEC;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.QAT_ZSTD_CODEC;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.ZSTD_CODEC;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.ZSTD_NO_DICT_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.QAT_DEFLATE_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.QAT_LZ4_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.QAT_ZSTD_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.ZSTD_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.ZSTD_NO_DICT_CODEC;
 import static org.opensearch.index.codec.customcodecs.backward_codecs.lucene99.Lucene99CustomCodec.DEFAULT_COMPRESSION_LEVEL;
 import static org.opensearch.index.engine.EngineConfig.INDEX_CODEC_COMPRESSION_LEVEL_SETTING;
 
@@ -218,14 +216,14 @@ public class CustomCodecTests extends OpenSearchTestCase {
         }
     }
 
-    public void testCodecServiceFactoryQatUnavailable() throws IOException {
+    public void testAdditionalCodecsQatUnavailable() throws IOException {
         if (!QatZipperFactory.isQatAvailable()) {
             Settings nodeSettings = Settings.builder()
                 .put(Environment.PATH_HOME_SETTING.getKey(), createTempDir())
                 .put("index.codec", randomFrom(QAT_DEFLATE_CODEC, QAT_LZ4_CODEC, QAT_ZSTD_CODEC))
                 .build();
             IndexSettings indexSettings = IndexSettingsModule.newIndexSettings("_na", nodeSettings);
-            assertThrows(IllegalArgumentException.class, () -> plugin.getCustomCodecServiceFactory(indexSettings));
+            assertThrows(IllegalArgumentException.class, () -> plugin.getAdditionalCodecs(indexSettings));
         }
     }
 
@@ -251,7 +249,12 @@ public class CustomCodecTests extends OpenSearchTestCase {
     private CodecService createCodecService(boolean isMapperServiceNull, boolean isCompositeIndexPresent) throws IOException {
         Settings nodeSettings = Settings.builder().put(Environment.PATH_HOME_SETTING.getKey(), createTempDir()).build();
         if (isMapperServiceNull) {
-            return new CustomCodecService(null, IndexSettingsModule.newIndexSettings("_na", nodeSettings), LogManager.getLogger("test"));
+            return new CodecService(
+                null,
+                IndexSettingsModule.newIndexSettings("_na", nodeSettings),
+                logger,
+                List.of(new CustomAdditionalCodecs())
+            );
         }
         if (isCompositeIndexPresent) {
             return buildCodecServiceWithCompositeIndex(nodeSettings);
@@ -263,7 +266,7 @@ public class CustomCodecTests extends OpenSearchTestCase {
         IndexSettings indexSettings = IndexSettingsModule.newIndexSettings("_na", nodeSettings);
         MapperService service = Mockito.mock(MapperService.class);
         Mockito.when(service.isCompositeIndexPresent()).thenReturn(true);
-        return new CustomCodecService(service, indexSettings, LogManager.getLogger("test"));
+        return new CodecService(service, indexSettings, LogManager.getLogger("test"), List.of(new CustomAdditionalCodecs()));
     }
 
     private CodecService createCodecService(int randomCompressionLevel, String codec) throws IOException {
@@ -292,11 +295,7 @@ public class CustomCodecTests extends OpenSearchTestCase {
             null
         );
 
-        Optional<CodecServiceFactory> customCodecServiceFactory = plugin.getCustomCodecServiceFactory(indexSettings);
-        if (customCodecServiceFactory.isPresent()) {
-            return customCodecServiceFactory.get().createCodecService(new CodecServiceConfig(indexSettings, service, logger));
-        }
-        return new CustomCodecService(service, indexSettings, LogManager.getLogger("test"));
+        return new CodecService(service, indexSettings, LogManager.getLogger("test"), List.of(new CustomAdditionalCodecs()));
     }
 
     private SegmentReader getSegmentReader(Codec codec) throws IOException {

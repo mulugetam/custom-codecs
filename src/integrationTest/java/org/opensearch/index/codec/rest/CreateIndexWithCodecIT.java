@@ -40,11 +40,11 @@ import java.util.Objects;
 
 import static org.opensearch.client.RestClientBuilder.DEFAULT_MAX_CONN_PER_ROUTE;
 import static org.opensearch.client.RestClientBuilder.DEFAULT_MAX_CONN_TOTAL;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.QAT_DEFLATE_CODEC;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.QAT_LZ4_CODEC;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.QAT_ZSTD_CODEC;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.ZSTD_CODEC;
-import static org.opensearch.index.codec.customcodecs.CustomCodecService.ZSTD_NO_DICT_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.QAT_DEFLATE_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.QAT_LZ4_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.QAT_ZSTD_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.ZSTD_CODEC;
+import static org.opensearch.index.codec.customcodecs.CustomAdditionalCodecs.ZSTD_NO_DICT_CODEC;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assume.assumeThat;
 
