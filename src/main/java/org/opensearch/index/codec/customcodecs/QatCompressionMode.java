@@ -89,11 +89,13 @@ public class QatCompressionMode extends CompressionMode {
     private static final class QatCompressor extends Compressor {
 
         private byte[] compressedBuffer;
+        private byte[] inputBuffer;
         private final QatZipper qatZipper;
 
         /** compressor with a given algorithm, compresion level, and execution mode */
         public QatCompressor(QatZipper.Algorithm algorithm, int compressionLevel, QatZipper.Mode qatMode) {
             compressedBuffer = BytesRef.EMPTY_BYTES;
+            inputBuffer = BytesRef.EMPTY_BYTES;
             qatZipper = QatZipperFactory.createInstance(algorithm, compressionLevel, qatMode, QatZipper.PollingMode.PERIODICAL);
         }
 
@@ -121,11 +123,8 @@ public class QatCompressionMode extends CompressionMode {
 
             int[] sizes = new int[numBlocks];
 
-            // Deflater-style incremental compression: start with the
-            // uncompressed length — compressed output is almost always
-            // smaller. Grow only when the native side signals overflow.
-            // Note: blockLength alone is too small because QAT adds
-            // per-block framing headers.
+            // Start with the uncompressed length — compressed output is
+            // almost always smaller. Grow only when native signals overflow.
             compressedBuffer = ArrayUtil.growNoCopy(compressedBuffer, length);
 
             int blocksCompleted = 0;
@@ -178,9 +177,9 @@ public class QatCompressionMode extends CompressionMode {
         @Override
         public void compress(ByteBuffersDataInput buffersInput, DataOutput out) throws IOException {
             final int length = (int) buffersInput.length();
-            byte[] bytes = new byte[length];
-            buffersInput.readBytes(bytes, 0, length);
-            compress(bytes, 0, length, out);
+            inputBuffer = ArrayUtil.grow(inputBuffer, length);
+            buffersInput.readBytes(inputBuffer, 0, length);
+            compress(inputBuffer, 0, length, out);
         }
 
         @Override
@@ -267,4 +266,3 @@ public class QatCompressionMode extends CompressionMode {
         }
     }
 }
-
