@@ -86,27 +86,20 @@ public class QatCompressionMode extends CompressionMode {
     }
 
     /** The QatCompressor.  */
+    /** The QatCompressor.  */
     private static final class QatCompressor extends Compressor {
 
         private byte[] compressedBuffer;
-        private byte[] inputBuffer;
         private final QatZipper qatZipper;
 
         /** compressor with a given algorithm, compresion level, and execution mode */
         public QatCompressor(QatZipper.Algorithm algorithm, int compressionLevel, QatZipper.Mode qatMode) {
             compressedBuffer = BytesRef.EMPTY_BYTES;
-            inputBuffer = BytesRef.EMPTY_BYTES;
             qatZipper = QatZipperFactory.createInstance(algorithm, compressionLevel, qatMode, QatZipper.PollingMode.PERIODICAL);
         }
 
         private void compress(byte[] bytes, int offset, int length, DataOutput out) throws IOException {
             assert offset >= 0 : "Offset value must be greater than 0.";
-
-            if (length == 0) {
-                out.writeVInt(0);
-                out.writeVInt(0);
-                return;
-            }
 
             int blockLength = (length + NUM_SUB_BLOCKS - 1) / NUM_SUB_BLOCKS;
             out.writeVInt(blockLength);
@@ -114,72 +107,29 @@ public class QatCompressionMode extends CompressionMode {
             final int end = offset + length;
             assert end >= 0 : "Buffer read size must be greater than 0.";
 
-            int numBlocks = (length + blockLength - 1) / blockLength;
+            for (int start = offset; start < end; start += blockLength) {
+                int l = Math.min(blockLength, end - start);
 
-            if (numBlocks == 0) {
-                out.writeVInt(0);
-                return;
-            }
-
-            int[] sizes = new int[numBlocks];
-
-            // Start with the uncompressed length — compressed output is
-            // almost always smaller. Grow only when native signals overflow.
-            compressedBuffer = ArrayUtil.growNoCopy(compressedBuffer, length);
-
-            int blocksCompleted = 0;
-            int dstOffset = 0;
-
-            while (blocksCompleted < numBlocks) {
-                int result = qatZipper.compressFull(
-                    bytes,
-                    offset,
-                    length,
-                    blockLength,
-                    compressedBuffer,
-                    dstOffset,
-                    compressedBuffer.length - dstOffset,
-                    sizes,
-                    blocksCompleted
-                );
-
-                if (result >= 0) {
-                    // All remaining blocks compressed successfully
-                    break;
+                if (l == 0) {
+                    out.writeVInt(0);
+                    return;
                 }
 
-                // Partial progress: result == -(blocksCompletedThisCall + 1)
-                int newlyCompleted = -(result + 1);
+                final int maxCompressedLength = qatZipper.maxCompressedLength(l);
+                compressedBuffer = ArrayUtil.growNoCopy(compressedBuffer, maxCompressedLength);
 
-                if (newlyCompleted == 0) {
-                    // No progress — buffer too small for even one block, grow
-                    compressedBuffer = ArrayUtil.grow(compressedBuffer);
-                } else {
-                    // Some blocks fit — advance and grow for the rest
-                    blocksCompleted += newlyCompleted;
-                    for (int i = blocksCompleted - newlyCompleted; i < blocksCompleted; i++) {
-                        dstOffset += sizes[i];
-                    }
-                    // Grow buffer to accommodate at least one more block
-                    compressedBuffer = ArrayUtil.grow(compressedBuffer, dstOffset + blockLength);
-                }
-            }
-
-            // Write VInt-prefixed compressed sub-blocks
-            int pos = 0;
-            for (int i = 0; i < numBlocks; i++) {
-                out.writeVInt(sizes[i]);
-                out.writeBytes(compressedBuffer, pos, sizes[i]);
-                pos += sizes[i];
+                int compressedSize = qatZipper.compress(bytes, start, l, compressedBuffer, 0, compressedBuffer.length);
+                out.writeVInt(compressedSize);
+                out.writeBytes(compressedBuffer, compressedSize);
             }
         }
 
         @Override
         public void compress(ByteBuffersDataInput buffersInput, DataOutput out) throws IOException {
             final int length = (int) buffersInput.length();
-            inputBuffer = ArrayUtil.grow(inputBuffer, length);
-            buffersInput.readBytes(inputBuffer, 0, length);
-            compress(inputBuffer, 0, length, out);
+            byte[] bytes = new byte[length];
+            buffersInput.readBytes(bytes, 0, length);
+            compress(bytes, 0, length, out);
         }
 
         @Override
